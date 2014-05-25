@@ -1,48 +1,91 @@
 
-window.onload = function(ev) {
-    buildBoard();
-};
-var playerTurn = "red";
+window.addEventListener("load", function(ev) {
+    var ROWS = 6;
+    var COLUMNS = 7;
 
+    buildBoard(ROWS, COLUMNS);
 
-function createDiv(className) {
+    initTurnChecker();
+});
+
+// Util
+function makeDiv(className) {
     var div = document.createElement("div");
     div.className = className;
     return div;
 }
 
-var columnHeight = [0, 0, 0, 0, 0, 0, 0];
-var cellBottoms = [];
-function buildBoard() {
-    var board = createDiv("board");
+function makeZeroedArray(size) {
+    var array = [];
+    while(size--) array[size] = 0;
+    return array;
+}
+
+function getPagePos(element) {
+    var x = 0;
+    var y = 0;
+    while (element != null) {
+        x += element.offsetLeft;
+        y += element.offsetTop;
+        element = element.offsetParent;
+    }
+
+    return {x: x,y: y};
+}
+
+// Connect 4
+var playerTurn = "black";
+
+var columnHeight = [];
+var rowBottoms   = [];
+var turnChecker;
+
+function initTurnChecker() {
+    turnChecker = document.querySelector(".turnChecker");
+    turnChecker.faceDown = false;
+}
+
+function buildBoard(rows, columns) {
+    var board = makeDiv("board");
     document.body.appendChild(board);
 
-    var column = 0;
-    for (var i = 1; i <= 42; i++) {
-        var cell = buildCell();
-        cell.column = column;
-        column++;
-        board.appendChild(cell);
+    // Initialize column heights.
+    columnHeight = makeZeroedArray(columns);
 
-        // Start a new row if index divides by 7 evenly.
-        if (i % 7 === 0) {
-            column = 0;
-            cellBottoms.unshift(cell.getBoundingClientRect().bottom);
-            var br = document.createElement("br");
-            board.appendChild(br);
+    // Add board cells.
+    for (var i = 0; i < rows; i++) {
+        for (var j = 0; j < columns; j++) {
+            var cell = buildCell();
+            cell.row = i;
+            cell.column = j;
+            board.appendChild(cell);
         }
+
+        // Has to be set after the cell is added to the page.
+        var pos = getPagePos(cell);
+        rowBottoms.unshift(pos.y + cell.offsetHeight);
+
+        // Add line break so that the next board cell starts the next row.
+        var br = document.createElement("br");
+        board.appendChild(br);
     }
-    console.log(cellBottoms);
+}
+
+function makeChecker(color, x, y) {
+    var checker = makeDiv(color + "Checker");
+    checker.style.left = x + "px";
+    checker.style.top = y + "px";
+    return checker;
 }
 
 function placeChecker(color, x, y, column) {
-    var checker = createDiv(color + "Checker");
-    checker.style.left = x + "px";
-    checker.style.top = y + "px";
+    var checker = makeChecker(color, x, y);
     document.body.appendChild(checker);
-    checker.height = checker.getBoundingClientRect().height;
 
-   var columnFloor = cellBottoms[columnHeight[column]];
+    // Has to be set after the checker is added to the page.
+    checker.height = checker.offsetHeight;
+
+    var columnFloor = rowBottoms[columnHeight[column]];
     dropChecker(checker, columnFloor);
     columnHeight[column]++;
     finishTurn();
@@ -59,11 +102,13 @@ function dropChecker(checker, floor) {
         setTimeout(function() {
             dropChecker(checker, floor);
         }, DROP_DELAY_MS);
+    } else {
+        console.log(floor);
     }
 }
 
 function buildCell() {
-    var cell = createDiv("boardCell");
+    var cell = makeDiv("boardCell");
     cell.onclick = function(ev) {
         if (columnHeight[cell.column] < 6) {
             placeChecker(playerTurn, cell.offsetLeft + 20, 0, cell.column); 
@@ -73,6 +118,7 @@ function buildCell() {
     return cell;
 }
 
+var flipsToFinish = 0;
 function finishTurn() {
     document.querySelector(".prompt").className += " hidden";
 
@@ -82,4 +128,12 @@ function finishTurn() {
     else {
         playerTurn = "red";
     }
+
+    flipsToFinish++;
+    var intervalHandle = setInterval(function() {
+        if (flipElement(turnChecker, flipsToFinish)) {
+            window.clearInterval(intervalHandle);
+            flipsToFinish--;
+        }
+    }, 100);
 }
